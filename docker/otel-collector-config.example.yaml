@@ -1,0 +1,48 @@
+# Example OpenTelemetry Collector config for Loki log shipping
+# See: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/lokiexporter
+
+receivers:
+  filelog:
+    include:
+      - /var/log/*.log
+    start_at: beginning
+    operators:
+      - type: json_parser
+        parse_from: attributes.message
+        timestamp:
+          parse_from: attributes.time
+  otlp:
+    protocol: http
+    host: 0.0.0.0
+    port: 4317
+
+exporters:
+  loki:
+    endpoint: ${LOKI_ENDPOINT:-http://loki:3100/loki/api/v1/push}
+    tenant_id: ${OTEL_LOKI_TENANT_ID}
+    tls:
+      insecure_skip_verify: false
+      ca_file: ${CA_FILE}
+      cert_file: ${CERT_FILE}
+      key_file: ${KEY_FILE}
+  tempo:
+    endpoint: ${TEMPO_EXPORTER_ENDPOINT:-tempo:4317}
+    tls:
+      ca_file: ${TEMPO_CA_FILE:-""}
+      cert_file: ${TEMPO_CERT_FILE:-""}
+      key_file: ${TEMPO_KEY_FILE:-""}
+      insecure_skip_verify: ${TEMPO_SKIP_VERIFY:-false}
+    auth:
+      basic:
+        username: ${TEMPO_USERNAME:-""}
+        password: ${TEMPO_PASSWORD:-""}
+      bearer_token: ${TEMPO_BEARER_TOKEN:-""}
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      exporters: [loki]
+    traces:
+      receivers: [otlp]
+      exporters: [tempo]

@@ -1,0 +1,5 @@
+# Exclude all documentation folders from Docker builds
+**/_docs
+
+# Exclude any example Tempo config files from Docker builds
+**/tempo*.example*

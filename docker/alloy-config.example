@@ -1,0 +1,52 @@
+# Example Alloy config for local/test deployments
+# See https://grafana.com/docs/alloy/latest/configuration/
+
+discovery.docker "containers" {}
+
+local.file_match "docker_logs" {
+  path_targets = discovery.docker.containers.targets
+  path_key     = "log_path"
+}
+
+loki.write "default" {
+  endpoint {
+    url = "${ALLOY_LOKI_ENDPOINT}"
+    # Uncomment for SSL/TLS
+    # ca_file   = "${CA_FILE}"
+    # cert_file = "${CERT_FILE}"
+    # key_file  = "${KEY_FILE}"
+  }
+  labels = {
+    job = "docker"
+    container = "{{.container_name}}"
+  }
+  forward_to = [local.file_match.docker_logs.receiver]
+}
+
+# TTL/Retention (if supported by Alloy version)
+# retention_period = "${ALLOY_RETENTION_PERIOD}"
+
+# Example: add an OTLP exporter for Tempo traces with SSL and env support
+exporters:
+  loki:
+    endpoint: ${LOKI_ENDPOINT:-http://loki:3100/loki/api/v1/push}
+  tempo:
+    endpoint: ${TEMPO_EXPORTER_ENDPOINT:-tempo:4317}
+    tls:
+      ca_file: ${TEMPO_CA_FILE:-""}
+      cert_file: ${TEMPO_CERT_FILE:-""}
+      key_file: ${TEMPO_KEY_FILE:-""}
+      insecure_skip_verify: ${TEMPO_SKIP_VERIFY:-false}
+    auth:
+      basic:
+        username: ${TEMPO_USERNAME:-""}
+        password: ${TEMPO_PASSWORD:-""}
+      bearer_token: ${TEMPO_BEARER_TOKEN:-""}
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      exporters: [loki]
+    traces:
+      receivers: [otlp]
+      exporters: [tempo]

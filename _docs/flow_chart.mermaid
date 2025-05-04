@@ -1,0 +1,62 @@
+%% Advanced Observability Flow: OpenTelemetry, Alloy, Loki, Tempo, Prometheus, Grafana
+%% Green: Source, Orange: Processing, Red: Storage, Pink: Visualization
+flowchart TD
+    subgraph Source Systems
+        A1["App Logs"]:::source
+        A2["Service Metrics"]:::source
+        A3["Distributed Traces"]:::source
+    end
+    subgraph OTLP Layer
+        B1["OTLP/gRPC"]:::proto
+        B2["OTLP/HTTP"]:::proto
+    end
+    subgraph Alloy_Processing["Grafana Alloy Processing Pipeline"]
+        C1["Receiver"]:::alloy
+        C2["Processor"]:::alloy
+        C3["Exporter"]:::alloy
+    end
+    subgraph Storage
+        D1["Loki (Logs)"]:::storage
+        D2["Prometheus (Metrics)"]:::storage
+        D3["Tempo (Traces)"]:::storage
+    end
+    subgraph Visualization
+        E1["Grafana Dashboards"]:::viz
+    end
+    %% Data Flow
+    A1-->|"OTLP"|B1
+    A1-->|"OTLP"|B2
+    A2-->|"OTLP"|B1
+    A2-->|"OTLP"|B2
+    A3-->|"OTLP"|B1
+    A3-->|"OTLP"|B2
+    B1-->|"gRPC"|C1
+    B2-->|"HTTP"|C1
+    C1-->|"Process"|C2
+    C2-->|"Batch/Transform"|C3
+    C3-->|"Logs"|D1
+    C3-->|"Metrics"|D2
+    C3-->|"Traces"|D3
+    D1-->|"Log Queries"|E1
+    D2-->|"Metric Queries"|E1
+    D3-->|"Trace Queries"|E1
+    %% Styling
+    classDef source fill:#b6e6bd,stroke:#333,stroke-width:2px;
+    classDef proto fill:#d2e6f7,stroke:#333,stroke-width:2px;
+    classDef alloy fill:#ffe5b4,stroke:#333,stroke-width:2px;
+    classDef storage fill:#ffb3b3,stroke:#333,stroke-width:2px;
+    classDef viz fill:#f7c6f7,stroke:#333,stroke-width:2px;
+    class A1,A2,A3 source;
+    class B1,B2 proto;
+    class C1,C2,C3 alloy;
+    class D1,D2,D3 storage;
+    class E1 viz;
+    %% Legend
+    subgraph Legend[Legend]
+        L1["Green: Sources"]:::source
+        L2["Blue: OTLP Protocol"]:::proto
+        L3["Orange: Alloy Processing"]:::alloy
+        L4["Red: Storage"]:::storage
+        L5["Pink: Visualization"]:::viz
+    end
+  

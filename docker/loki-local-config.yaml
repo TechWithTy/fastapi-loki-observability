@@ -1,0 +1,43 @@
+# Example Loki config for local or test deployments
+# See https://grafana.com/docs/loki/latest/configuration/
+
+server:
+  http_listen_port: 3100
+  # Uncomment for SSL/TLS
+  # http_tls_config:
+  #   cert_file: /etc/ssl/certs/server.crt
+  #   key_file: /etc/ssl/private/server.key
+  #   client_ca_file: /etc/ssl/certs/ca.crt
+
+common:
+  path: /loki
+  storage:
+    filesystem:
+      directory: /loki/chunks
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+limits_config:
+  retention_period: ${LOKI_RETENTION_PERIOD}
+  max_streams_per_user: 0
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+# Enable authentication if required
+# auth_enabled: ${LOKI_AUTH_ENABLED}
+
+# Enable admin API if required
+# admin_api:
+#   enabled: ${LOKI_ADMIN_API_ENABLED}

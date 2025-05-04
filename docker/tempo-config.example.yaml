@@ -1,0 +1,36 @@
+# Example Tempo config for distributed tracing with SSL and environment variable support
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:${OTLP_GRPC_PORT:-4317}
+        tls:
+          cert_file: ${OTLP_GRPC_CERT_FILE:-""}
+          key_file: ${OTLP_GRPC_KEY_FILE:-""}
+          ca_file: ${OTLP_GRPC_CA_FILE:-""}
+          insecure_skip_verify: ${OTLP_GRPC_SKIP_VERIFY:-false}
+      http:
+        endpoint: 0.0.0.0:${OTLP_HTTP_PORT:-4318}
+        tls:
+          cert_file: ${OTLP_HTTP_CERT_FILE:-""}
+          key_file: ${OTLP_HTTP_KEY_FILE:-""}
+          ca_file: ${OTLP_HTTP_CA_FILE:-""}
+          insecure_skip_verify: ${OTLP_HTTP_SKIP_VERIFY:-false}
+exporters:
+  tempo:
+    endpoint: ${TEMPO_EXPORTER_ENDPOINT:-tempo:4317}
+    tls:
+      ca_file: ${TEMPO_CA_FILE:-""}
+      cert_file: ${TEMPO_CERT_FILE:-""}
+      key_file: ${TEMPO_KEY_FILE:-""}
+      insecure_skip_verify: ${TEMPO_SKIP_VERIFY:-false}
+    auth:
+      basic:
+        username: ${TEMPO_USERNAME:-""}
+        password: ${TEMPO_PASSWORD:-""}
+      bearer_token: ${TEMPO_BEARER_TOKEN:-""}
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [tempo]
