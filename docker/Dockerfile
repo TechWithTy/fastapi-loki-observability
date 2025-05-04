@@ -40,7 +40,7 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 CMD ["sh", "-c", "if [ -f /etc/loki/loki-local-config.yaml ]; then exec /usr/bin/loki -config.file=/etc/loki/loki-local-config.yaml; else exec /usr/bin/loki -config.file=/etc/loki/local-config.yaml; fi"]
 
 ############################
-# Alloy Stage
+# * Alloy Stage
 ############################
 FROM grafana/alloy:latest AS alloy
 LABEL maintainer="YourTeam <your@email.com>"
@@ -85,11 +85,35 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 # Use example config if present, fallback to default
 CMD ["sh", "-c", "if [ -f /etc/otelcol/otel-collector-config.example.yaml ]; then exec /otelcol --config=/etc/otelcol/otel-collector-config.example.yaml; else exec /otelcol --config=/etc/otelcol/config.yaml; fi"]
 
-# --- Tempo ---
-# Add a multi-stage build for Tempo or copy a local config if needed
-# Example: Uncomment and adjust as needed for your stack
-# COPY tempo.yaml /etc/tempo/tempo.yaml
-# EXPOSE 3200 4317
+############################
+# Tempo Stage (Optional)
+############################
+FROM grafana/tempo:latest AS tempo
+LABEL maintainer="YourTeam <your@email.com>"
+WORKDIR /etc/tempo
+
+# Copy in example config if present (for local/test only)
+COPY tempo-config.example.yaml ./tempo-config.example.yaml
+
+# Environment variables for secrets/config (override at runtime)
+#  ! Uncomment the following section to use Tempo configuration
+
+# ENV TEMPO_PORT=${TEMPO_PORT:-3200}
+# ENV TEMPO_OTLP_PORT=${TEMPO_OTLP_PORT:-4317}
+# ENV TEMPO_STORAGE_PATH=${TEMPO_STORAGE_PATH:-/var/tempo}
+# ENV TEMPO_RETENTION_PERIOD=${TEMPO_RETENTION_PERIOD:-168h}
+# ENV TEMPO_RECEIVER_JAEGER_PORT=${TEMPO_RECEIVER_JAEGER_PORT:-14250}
+# ENV TEMPO_ZIPKIN_PORT=${TEMPO_ZIPKIN_PORT:-9411}
+
+# # Expose configurable ports
+# EXPOSE ${TEMPO_PORT} ${TEMPO_OTLP_PORT} ${TEMPO_RECEIVER_JAEGER_PORT} ${TEMPO_ZIPKIN_PORT}
+
+# # Healthcheck for Tempo
+# HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+#   CMD wget --spider --quiet http://localhost:${TEMPO_PORT}/ready || exit 1
+
+# # Use example config if present, fallback to default
+# CMD ["sh", "-c", "if [ -f /etc/tempo/tempo-config.example.yaml ]; then exec tempo -config.file=/etc/tempo/tempo-config.example.yaml; else exec tempo -config.file=/etc/tempo/tempo.yaml; fi"]
 
 ############################
 # Usage Notes
