@@ -1,0 +1,35 @@
+# docker-compose.loki.yml
+version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:2.9.2 # Pinned version
+    container_name: loki
+    restart: unless-stopped
+    # Command points to the configuration file inside the container
+    command: -config.file=/etc/loki/loki-config.yaml
+    ports:
+      # Expose Loki's API/ingestion port
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      # Mount your Loki configuration file (read-only)
+      - ./config/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro # Verify host path
+      # Mount the volume for Loki data storage (index, chunks)
+      - loki-data:/loki
+    networks:
+      - app-network # So Grafana, Alloy, Otelcol can connect
+    environment:
+      # Environment variables are often minimal for Loki; configuration is primarily done
+      # via the config file. Pass secrets (e.g., S3 credentials) needed by the config file
+      # securely (e.g., via Docker Secrets or secured environment variables if templating config).
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} # Example if using S3 backend
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} # Example if using S3 backend
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME} # Example if using S3 backend
+
+networks:
+  app-network:
+    external: true # Assume network created elsewhere
+
+volumes:
+  loki-data:
+    # Define volume used by Loki
