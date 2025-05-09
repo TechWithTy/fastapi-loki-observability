@@ -16,7 +16,7 @@ def test_loki_tls_endpoint(start_observability_stack):
     Verify Loki endpoint is available via HTTPS (if enabled), or HTTP otherwise.
     """
     loki_url_candidates = [
-        os.environ.get("LOKI_URL", "http://localhost:3100"),
+        os.environ.get("LOKI_URL", "http://localhost:3000"),
         "http://loki:3100"
     ]
     debug_errors = []
@@ -32,7 +32,9 @@ def test_loki_tls_endpoint(start_observability_stack):
             # Remove any trailing port
             if ":" in test_url:
                 test_url = test_url.split(":")[0]
-            test_url = f"{scheme}://{test_url}:3100"
+            # Use port 3000 for localhost, 3100 for Docker service name
+            port = 3000 if test_url.startswith("localhost") else 3100
+            test_url = f"{scheme}://{test_url}:{port}"
             print(f"[DEBUG] Trying Loki /ready endpoint at: {test_url}")
             try:
                 with httpx.Client(verify=False, timeout=3) as client:

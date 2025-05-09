@@ -40,10 +40,10 @@ def test_loki_settings_loaded(loki_test_settings):
     This test ensures that all environment overrides are respected.
     """
     import socket, subprocess
-    loki_url = "http://localhost:3100"
+    loki_url = "http://localhost:3000"
     print(f"[DEBUG] (test_loki_settings_loaded) Using loki_url: {loki_url}")
     host = loki_url.split('//')[-1].split(':')[0]
-    port = int(loki_url.split(':')[-1]) if ':' in loki_url else 3100
+    port = int(loki_url.split(':')[-1]) if ':' in loki_url else 3000
     print(f"[DEBUG] (test_loki_settings_loaded) host: {host}, port: {port}")
     docker_ps = subprocess.run(["docker", "ps"], capture_output=True, text=True)
     print("[DEBUG] (test_loki_settings_loaded) docker ps output:\n" + docker_ps.stdout)
