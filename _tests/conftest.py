@@ -4,15 +4,24 @@ Spins up containers using Docker Compose for integration/E2E tests.
 Ensures all test data is cleaned up after each test.
 Also loads and sets environment variables from canonical Loki config for all tests.
 """
+import os
 import subprocess
 import time
-import os
 from pathlib import Path
 
 import pytest
+from prometheus_client import REGISTRY
+
 from app.core.loki import config
 
-DOCKER_COMPOSE_FILE = Path(__file__).parent.parent / "docker" / "docker-compose.test.yml"
+@pytest.fixture(autouse=True)
+def clear_prometheus_registry():
+    # Remove all collectors between tests to avoid duplicate metric errors
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        REGISTRY.unregister(collector)
+
+DOCKER_COMPOSE_FILE = Path(__file__).parent.parent / "docker" / "docker-compose.loki.yml"
 
 @pytest.fixture(scope="session", autouse=True)
 def set_loki_env_vars():
@@ -42,18 +51,26 @@ def start_observability_stack(set_loki_env_vars):
     Ensures env vars are set before containers start.
     """
     # Start containers
+    print("[DEBUG] Starting Loki and observability stack via Docker Compose...")
     subprocess.run([
         "docker-compose", "-f", str(DOCKER_COMPOSE_FILE), "up", "-d"
     ], check=True)
+    print("[DEBUG] Docker Compose up -d complete. Waiting for Loki to become healthy...")
     # Wait for services to be healthy
-    for _ in range(30):
+    for i in range(30):
         result = subprocess.run([
             "docker", "inspect", "--format=\"{{.State.Health.Status}}\"", "loki"
         ], capture_output=True, text=True)
+        print(f"[DEBUG] Health probe {i+1}/30: {result.stdout.strip()} (stderr: {result.stderr.strip()})")
         if 'healthy' in result.stdout:
+            print("[DEBUG] Loki is healthy!")
+            # Print docker ps output for debug
+            docker_ps = subprocess.run(["docker", "ps"], capture_output=True, text=True)
+            print("[DEBUG] docker ps output after Loki healthy:\n" + docker_ps.stdout)
             break
         time.sleep(2)
     else:
+        print("[DEBUG] Loki did not become healthy in time. Last inspect output:", result.stdout, result.stderr)
         raise RuntimeError("Loki did not become healthy in time.")
     yield
     # Tear down containers

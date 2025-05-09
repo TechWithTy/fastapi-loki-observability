@@ -155,7 +155,7 @@ limits_config:
     # index_label action for Resource Attributes
     [action: <string> | default = ""]
   
-    # List of attributes to configure how to store them or drop them altogether
+    # list of attributes to configure how to store them or drop them altogether
     [attributes: <list of strings>]
   
     # Regex to choose attributes to configure how to store them or drop them

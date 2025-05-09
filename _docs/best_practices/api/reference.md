@@ -971,7 +971,7 @@ GET /config
 /config exposes the current configuration. The optional mode query parameter can be used to modify the output. If it has the value diffs only the differences between the default configuration and the current are returned. A value of defaults returns the default configuration.
 
 In microservices mode, the /config endpoint is exposed by all components.
-List running services
+list running services
 bash
 
 GET /services
@@ -1059,12 +1059,12 @@ bash
 GET /ruler/ring
 
 Displays a web page with the ruler hash ring status, including the state, health, and last heartbeat time of each ruler.
-List rule groups
+list rule groups
 bash
 
 GET /loki/api/v1/rules
 
-List all rules configured for the authenticated tenant. This endpoint returns a YAML dictionary with all the rule groups for each namespace and 200 status code on success.
+list all rules configured for the authenticated tenant. This endpoint returns a YAML dictionary with all the rule groups for each namespace and 200 status code on success.
 Example response
 yaml
 
@@ -1166,7 +1166,7 @@ bash
 DELETE /loki/api/v1/rules/{namespace}
 
 Deletes all the rule groups in a namespace (including the namespace itself). This endpoint returns 202 on success.
-List rules
+list rules
 bash
 
 GET /prometheus/api/v1/rules?type={alert|record}&file={}&rule_group={}&rule_name={}
@@ -1178,7 +1178,7 @@ The type parameter is optional. If set, only the specified type of rule is retur
 The file, rule_group and rule_name parameters are optional, and can accept multiple values. If set, the response content is filtered accordingly.
 
 For more information, refer to the Prometheus rules documentation.
-List alerts
+list alerts
 bash
 
 GET /prometheus/api/v1/alerts
@@ -1229,16 +1229,16 @@ curl -u "Tenant1:$API_TOKEN" \
   -g -X POST \
   'http://127.0.0.1:3100/loki/api/v1/delete?query={foo="bar"}&start=1591616227&end=1591619692'
 
-List log deletion requests
+list log deletion requests
 bash
 
 GET /loki/api/v1/delete
 
-List the existing delete requests for the authenticated tenant. The log entry deletion documentation has configuration details.
+list the existing delete requests for the authenticated tenant. The log entry deletion documentation has configuration details.
 
 Log entry deletion is supported only when TSDB or BoltDB Shipper is configured for the index store.
 
-List the existing delete requests using the following API:
+list the existing delete requests using the following API:
 bash
 
 GET /loki/api/v1/delete

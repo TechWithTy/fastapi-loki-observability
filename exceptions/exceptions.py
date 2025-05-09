@@ -21,7 +21,7 @@ class APIError(HTTPException):
         status_code: int,
         error_code: str,
         message: str,
-        details: Optional[dict[str, Any]] = None,
+        details:  dict[str, Any] = None,
     ):
         super().__init__(
             status_code=status_code,
@@ -40,7 +40,7 @@ class BadRequestError(APIError):
     """400 - Invalid request parameters"""
 
     def __init__(
-        self, message: str = "Invalid request", details: dict[str, Any] | None = None
+        self, message: str = "Invalid request", details: dict[str, Any] | None
     ):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,

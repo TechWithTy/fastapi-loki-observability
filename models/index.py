@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 class LokiConfig(BaseModel):
     url: str
-    tenant_id: str | None = None
+    tenant_id: str | None
     tls_enabled: bool = False
 
 

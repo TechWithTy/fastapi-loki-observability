@@ -6,14 +6,13 @@ services:
     image: grafana/loki:2.9.2 # Pinned version
     container_name: loki
     restart: unless-stopped
-    # Command points to the configuration file inside the container
-    command: -config.file=/etc/loki/loki-config.yaml
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /loki/index /loki/index_cache /loki/chunks && exec /usr/bin/loki -config.file=/etc/loki/loki-config.yaml -config.expand-env=true"]
     ports:
       # Expose Loki's API/ingestion port
       - "${LOKI_PORT:-3100}:3100"
     volumes:
-      # Mount your Loki configuration file (read-only)
-      - ./config/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro # Verify host path
+      # Mount the correct Loki configuration file (read-only)
+      - ./loki-local-config.yaml:/etc/loki/loki-config.yaml:ro
       # Mount the volume for Loki data storage (index, chunks)
       - loki-data:/loki
     networks:
@@ -25,6 +24,11 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} # Example if using S3 backend
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} # Example if using S3 backend
       - S3_BUCKET_NAME=${S3_BUCKET_NAME} # Example if using S3 backend
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 networks:
   app-network:
