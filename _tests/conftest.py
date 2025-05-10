@@ -50,12 +50,23 @@ def start_observability_stack(set_loki_env_vars):
     Start Loki, Alloy, and Otel Collector via Docker Compose for integration tests.
     Ensures env vars are set before containers start.
     """
-    # Start containers
-    print("[DEBUG] Starting Loki and observability stack via Docker Compose...")
-    subprocess.run([
-        "docker-compose", "-f", str(DOCKER_COMPOSE_FILE), "up", "-d"
-    ], check=True)
-    print("[DEBUG] Docker Compose up -d complete. Waiting for Loki to become healthy...")
+    def is_loki_healthy():
+        result = subprocess.run([
+            "docker", "inspect", "--format={{.State.Health.Status}}", "loki"
+        ], capture_output=True, text=True)
+        return 'healthy' in result.stdout
+
+    # * Only start/stop Loki if not already healthy
+    loki_started_by_fixture = False
+    if not is_loki_healthy():
+        print("[DEBUG] Starting Loki and observability stack via Docker Compose...")
+        subprocess.run([
+            "docker-compose", "-f", str(DOCKER_COMPOSE_FILE), "up", "-d"
+        ], check=True)
+        loki_started_by_fixture = True
+        print("[DEBUG] Docker Compose up -d complete. Waiting for Loki to become healthy...")
+    else:
+        print("[DEBUG] Loki is already healthy and running. Skipping Docker Compose up.")
     # Wait for services to be healthy
     for i in range(30):
         result = subprocess.run([
@@ -73,7 +84,10 @@ def start_observability_stack(set_loki_env_vars):
         print("[DEBUG] Loki did not become healthy in time. Last inspect output:", result.stdout, result.stderr)
         raise RuntimeError("Loki did not become healthy in time.")
     yield
-    # Tear down containers
-    subprocess.run([
-        "docker-compose", "-f", str(DOCKER_COMPOSE_FILE), "down", "-v"
-    ], check=True)
+    if loki_started_by_fixture:
+        # Tear down containers only if we started them
+        subprocess.run([
+            "docker-compose", "-f", str(DOCKER_COMPOSE_FILE), "down", "-v"
+        ], check=True)
+    else:
+        print("[DEBUG] Loki was not started by fixture; skipping Docker Compose down.")

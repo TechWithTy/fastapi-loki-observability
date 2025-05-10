@@ -1,9 +1,21 @@
-# Example Loki config for local or test deployments
+# Example Loki config for local/test deployments
 # See https://grafana.com/docs/loki/latest/configuration/
+#
+# * Edge Cases & Debugging Notes:
+#   - If Loki is stuck restarting, check Docker volume permissions and YAML syntax.
+#   - WAL, compactor, and chunk/index dirs must be writable and mapped as volumes.
+#   - For "too many unhealthy instances in the ring", ensure replication_factor: 1 below.
+#   - For "Server disconnected without sending a response", check Loki logs for config errors.
+#   - If using S3 or GCS, set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME, etc.
+#   - If you change the config, always restart the container.
+
+# Disable auth for local/dev
+auth_enabled: false
 
 server:
   http_listen_port: 3100
 
+# Storage config (filesystem for local/dev)
 storage_config:
   boltdb_shipper:
     active_index_directory: /loki/index
@@ -12,9 +24,11 @@ storage_config:
   filesystem:
     directory: /loki/chunks
 
+# Compactor config
 compactor:
   working_directory: /loki/compactor
 
+# Ingester config for single-node local/dev
 ingester:
   wal:
     enabled: true
@@ -23,8 +37,12 @@ ingester:
     ring:
       kvstore:
         store: inmemory
+      replication_factor: 1
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+  max_transfer_retries: 0
 
-
+# Schema config
 schema_config:
   configs:
     - from: 2020-10-24
@@ -35,11 +53,21 @@ schema_config:
         prefix: index_
         period: 24h
 
+# Limits config (no replication_factor here!)
 limits_config:
-  retention_period: ${LOKI_RETENTION_PERIOD}
+  retention_period: 168h
   max_streams_per_user: 0
   reject_old_samples: true
   reject_old_samples_max_age: 168h
 
 # Optional: Enable authentication if required
 # auth_enabled: ${LOKI_AUTH_ENABLED}
+
+# ---
+# Troubleshooting:
+# - If WAL or compactor errors appear, check that /loki is mounted as a Docker volume.
+# - If using Docker Compose, ensure:
+#     volumes:
+#       - ./loki-data:/loki
+# - To reset all data, stop Loki and delete ./loki-data.
+# ---

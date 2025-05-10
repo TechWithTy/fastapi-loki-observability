@@ -12,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.core.config import settings
 
 # Loki
-LOKI_URL = settings.monitoring.GRAFANA_URL
-LOKI_PORT = settings.monitoring.GRAFANA_PORT
+LOKI_URL = settings.monitoring.LOKI_URL
+LOKI_PORT = settings.monitoring.LOKI_PORT
 
 # Grafana
 GRAFANA_URL = settings.monitoring.GRAFANA_URL
@@ -30,7 +30,7 @@ REDIS_PASSWORD = settings.redis.REDIS_PASSWORD or ""
 FASTAPI_PORT = settings.app.FASTAPI_PORT
 
 # OTEL Exporter
-OTEL_EXPORTER_OTLP_ENDPOINT = settings.security.OTEL_EXPORTER_OTLP_ENDPOINT
-OTEL_EXPORTER_OTLP_INSECURE = settings.security.OTEL_EXPORTER_OTLP_INSECURE
+OTEL_EXPORTER_OTLP_ENDPOINT = settings.monitoring.OTEL_EXPORTER_OTLP_ENDPOINT
+OTEL_EXPORTER_OTLP_INSECURE = settings.monitoring.OTEL_EXPORTER_OTLP_INSECURE
 
 # Add additional config values as needed for observability stack
