@@ -35,9 +35,9 @@ def set_loki_env_vars():
     os.environ["GRAFANA_PORT"] = str(config.GRAFANA_PORT)
     os.environ["GRAFANA_ADMIN_USER"] = config.GRAFANA_ADMIN_USER
     os.environ["GRAFANA_ADMIN_PASSWORD"] = config.GRAFANA_ADMIN_PASSWORD
-    os.environ["REDIS_HOST"] = config.REDIS_HOST
-    os.environ["REDIS_PORT"] = str(config.REDIS_PORT)
-    os.environ["REDIS_PASSWORD"] = config.REDIS_PASSWORD
+    # os.environ["REDIS_HOST"] = config.REDIS_HOST  # Commented out - not in config
+    # os.environ["REDIS_PORT"] = str(config.REDIS_PORT)  # Commented out - not in config
+    # os.environ["REDIS_PASSWORD"] = config.REDIS_PASSWORD  # Commented out - not in config
     os.environ["FASTAPI_PORT"] = str(config.FASTAPI_PORT)
     os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = config.OTEL_EXPORTER_OTLP_ENDPOINT
     os.environ["OTEL_EXPORTER_OTLP_INSECURE"] = str(config.OTEL_EXPORTER_OTLP_INSECURE)
@@ -77,7 +77,7 @@ def start_observability_stack(set_loki_env_vars):
             print("[DEBUG] Loki is healthy!")
             # Print docker ps output for debug
             docker_ps = subprocess.run(["docker", "ps"], capture_output=True, text=True)
-            print("[DEBUG] docker ps output after Loki healthy:\n" + docker_ps.stdout)
+            print("[DEBUG] docker ps output after Loki healthy:\n" + (docker_ps.stdout or "No output"))
             break
         time.sleep(2)
     else:

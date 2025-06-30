@@ -40,7 +40,7 @@ class BadRequestError(APIError):
     """400 - Invalid request parameters"""
 
     def __init__(
-        self, message: str = "Invalid request", details: dict[str, Any] | None
+        self, message: str = "Invalid request", details: dict[str, Any] | None = None
     ):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -137,4 +137,3 @@ def log_and_raise_http_exception(logger, error_class, *args, log_message=None, *
     logger.error(f"HTTP {exception.status_code}: {message}")
     raise exception
 
-        )
