@@ -2,6 +2,7 @@
 Core Loki implementation for log aggregation and querying.
 Integrates with existing telemetry, tempo, and FastAPI infrastructure.
 """
+import asyncio
 import json
 import logging
 import os
@@ -90,20 +91,28 @@ class LokiClient:
     async def push_logs(
         self,
         logs: List[Dict[str, Any]],
-        labels: Optional[Dict[str, str]] = None
+        labels: Optional[Dict[str, str]] = None,
+        timeout: Optional[int] = None
     ) -> bool:
         """
-        Push logs to Loki.
+        Push logs to Loki with optimized batching and timeout control.
         
         Args:
             logs: List of log entries with 'timestamp' and 'message' keys
             labels: Additional labels for the log stream
+            timeout: Request timeout in seconds (defaults to 5s for fast response)
             
         Returns:
             True if successful, False otherwise
         """
+        # Use shorter timeout for non-blocking operation
+        request_timeout = timeout or 2  # Default to 2s instead of 5s for faster failure
+        
         with self.tracer.start_as_current_span("loki_push_logs") as span:
             try:
+                span.set_attribute("loki.logs_count", len(logs))
+                span.set_attribute("loki.timeout", request_timeout)
+                
                 # Prepare default labels
                 default_labels = {
                     "service": os.getenv("SERVICE_NAME", "fastapi-connect"),
@@ -114,8 +123,10 @@ class LokiClient:
                 # Merge with provided labels
                 stream_labels = {**default_labels, **(labels or {})}
                 
-                # Convert logs to Loki format
+                # Convert logs to Loki format efficiently
                 values = []
+                current_time_ns = str(int(time.time() * 1_000_000_000))
+                
                 for log in logs:
                     timestamp = log.get("timestamp")
                     if isinstance(timestamp, datetime):
@@ -126,9 +137,13 @@ class LokiClient:
                         timestamp_ns = str(int(timestamp * 1_000_000_000))
                     else:
                         # Use current time if timestamp is invalid
-                        timestamp_ns = str(int(time.time() * 1_000_000_000))
+                        timestamp_ns = current_time_ns
                     
-                    message = log.get("message", str(log))
+                    # Efficiently serialize message
+                    message = log.get("message")
+                    if not isinstance(message, str):
+                        message = json.dumps(log) if isinstance(log, dict) else str(log)
+                    
                     values.append([timestamp_ns, message])
                 
                 # Create Loki push request
@@ -141,27 +156,36 @@ class LokiClient:
                     ]
                 )
                 
-                # Send to Loki
+                # Send to Loki with timeout
                 url = f"{self.loki_url}/loki/api/v1/push"
+                
+                # Use optimized HTTP client settings
                 response = await self.client.post(
                     url,
                     json=push_request.model_dump(),
-                    headers={"Content-Type": "application/json"}
+                    headers={"Content-Type": "application/json"},
+                    timeout=request_timeout
                 )
                 
                 # Add span attributes
                 span.set_attribute("loki.url", url)
-                span.set_attribute("loki.logs_count", len(logs))
                 span.set_attribute("loki.response_status", response.status_code)
                 
                 if response.status_code == 204:
-                    logger.debug(f"Successfully pushed {len(logs)} logs to Loki")
+                    span.set_attribute("loki.success", True)
+                    logger.debug(f"Successfully pushed {len(logs)} logs to Loki in {request_timeout}s timeout")
                     return True
                 else:
-                    logger.error(f"Failed to push logs to Loki: {response.status_code} - {response.text}")
+                    span.set_attribute("loki.success", False)
                     span.set_attribute("loki.error", response.text)
+                    logger.error(f"Failed to push logs to Loki: {response.status_code} - {response.text}")
                     return False
                     
+            except asyncio.TimeoutError:
+                logger.warning(f"Loki push timeout after {request_timeout}s - logs may be lost")
+                span.set_attribute("loki.timeout_error", True)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, "Timeout"))
+                return False
             except Exception as e:
                 logger.error(f"Error pushing logs to Loki: {str(e)}")
                 span.set_attribute("loki.error", str(e))
@@ -312,9 +336,10 @@ class FastAPILokiHandler(logging.Handler):
         super().__init__(level)
         self.loki_client = loki_client
         self.log_buffer = []
-        self.buffer_size = 100
+        self.buffer_size = 50  # Smaller buffer for faster flushing
         self.last_flush = time.time()
-        self.flush_interval = 10  # seconds
+        self.flush_interval = 5  # More frequent flushes (5 seconds)
+        self._flush_lock = asyncio.Lock()
     
     def emit(self, record: logging.LogRecord):
         """
@@ -351,28 +376,43 @@ class FastAPILokiHandler(logging.Handler):
             print(f"Error in Loki handler: {str(e)}")
     
     def flush_async(self):
-        """Flush log buffer to Loki asynchronously."""
-        if self.log_buffer:
-            # Create a copy of the buffer and clear it
-            logs_to_send = self.log_buffer.copy()
-            self.log_buffer.clear()
-            self.last_flush = time.time()
+        """Flush log buffer to Loki asynchronously with improved error handling."""
+        if not self.log_buffer:
+            return
             
-            # Send logs in the background safely
+        # Create a copy of the buffer and clear it immediately
+        logs_to_send = self.log_buffer.copy()
+        self.log_buffer.clear()
+        self.last_flush = time.time()
+        
+        # Send logs in the background safely without blocking
+        def _background_flush():
+            """Background task to flush logs to Loki."""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
             try:
-                import asyncio
-                # Check if we're in an async context
-                try:
-                    loop = asyncio.get_running_loop()
-                    # Create task in the current event loop
-                    asyncio.create_task(self.loki_client.push_logs(logs_to_send))
-                except RuntimeError:
-                    # No event loop running, create a new one for this operation
-                    asyncio.run(self.loki_client.push_logs(logs_to_send))
+                # Use shorter timeout for background operations
+                result = loop.run_until_complete(
+                    asyncio.wait_for(
+                        self.loki_client.push_logs(logs_to_send, timeout=1),
+                        timeout=2.0  # Overall timeout of 2s
+                    )
+                )
+                if not result:
+                    logger.debug("Failed to send logs to Loki (background)")
+            except asyncio.TimeoutError:
+                logger.debug("Loki background flush timeout - logs may be lost")
             except Exception as e:
-                print(f"Error flushing logs to Loki: {str(e)}")
-                # Re-add logs to buffer for retry if sending failed
-                self.log_buffer.extend(logs_to_send)
+                logger.debug(f"Error in background Loki flush: {str(e)}")
+                # Don't re-add logs to buffer to avoid memory leaks
+            finally:
+                loop.close()
+        
+        # Run in a separate thread to avoid blocking
+        import threading
+        thread = threading.Thread(target=_background_flush, daemon=True)
+        thread.start()
 
 
 # Global Loki client instance
@@ -478,16 +518,47 @@ def add_request_logging_middleware(app: FastAPI):
             "user_agent": request.headers.get("user-agent", "unknown")
         }
         
-        # Send to Loki if client is available
+        # Send to Loki in background to avoid blocking the response
         try:
             loki_client = get_loki_client()
+            if loki_client:
+                # Use asyncio.create_task to run in background without blocking
+                import asyncio
+                asyncio.create_task(
+                    _background_log_to_loki(loki_client, log_data, method, response.status_code)
+                )
+        except Exception as e:
+            # Don't let logging errors affect the response
+            logger.debug(f"Failed to schedule background log to Loki: {str(e)}")
+        
+        return response
+
+async def _background_log_to_loki(loki_client: LokiClient, log_data: dict, method: str, status_code: int):
+    """
+    Send log data to Loki in the background with proper OTel tracing.
+    
+    Args:
+        loki_client: Loki client instance
+        log_data: Log data to send
+        method: HTTP method
+        status_code: HTTP status code
+    """
+    with trace.get_tracer(__name__).start_as_current_span("loki_background_log") as span:
+        try:
+            span.set_attribute("loki.method", method)
+            span.set_attribute("loki.status_code", status_code)
+            span.set_attribute("loki.background", True)
+            
+            # Send with shorter timeout to avoid blocking
             await loki_client.push_logs([log_data], labels={
                 "log_type": "http_request",
                 "method": method,
-                "status_code": str(response.status_code)
-            })
+                "status_code": str(status_code)
+            }, timeout=2)  # Use 2s timeout for background operations
+            
+            span.set_attribute("loki.success", True)
         except Exception as e:
-            # Don't let logging errors affect the response
-            logger.debug(f"Failed to log request to Loki: {str(e)}")
-        
-        return response
+            span.set_attribute("loki.success", False)
+            span.set_attribute("loki.error", str(e))
+            span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            logger.debug(f"Background Loki log failed (non-blocking): {str(e)}")
