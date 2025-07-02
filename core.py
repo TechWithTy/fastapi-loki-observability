@@ -301,17 +301,18 @@ class LokiClient:
     
     async def health_check(self) -> bool:
         """
-        Check Loki health status.
+        Check Loki health status with short timeout.
         
         Returns:
             True if Loki is healthy, False otherwise
         """
         try:
             url = f"{self.loki_url}/ready"
-            response = await self.client.get(url)
+            # Use a very short timeout for health checks to prevent hanging
+            response = await self.client.get(url, timeout=3.0)
             return response.status_code == 200
         except Exception as e:
-            logger.error(f"Loki health check failed: {str(e)}")
+            logger.warning(f"Loki health check failed: {str(e)}")
             return False
     
     async def close(self):
@@ -396,7 +397,7 @@ class FastAPILokiHandler(logging.Handler):
                 result = loop.run_until_complete(
                     asyncio.wait_for(
                         self.loki_client.push_logs(logs_to_send, timeout=1),
-                        timeout=2.0  # Overall timeout of 2s
+                        timeout=5.0  # Overall timeout of 2s
                     )
                 )
                 if not result:
