@@ -56,7 +56,7 @@ class LokiClient:
         self,
         loki_url: Optional[str] = None,
         tenant_id: Optional[str] = None,
-        timeout: int = 30,
+        timeout: int = 15,
         headers: Optional[Dict[str, str]] = None
     ):
         """
