@@ -523,27 +523,10 @@ def add_request_logging_middleware(app: FastAPI):
             "user_agent": request.headers.get("user-agent", "unknown")
         }
         
-        # Send to Loki in a truly background thread to avoid any async blocking
+        # Use the new background task system for completely non-blocking logging
         try:
-            loki_client = get_loki_client()
-            if loki_client:
-                # Use thread pool to completely decouple from request lifecycle
-                import threading
-                def _thread_log_to_loki():
-                    try:
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(
-                            _background_log_to_loki(loki_client, log_data, method, response.status_code)
-                        )
-                    except Exception as e:
-                        logger.debug(f"Background Loki log failed (non-blocking): {str(e)}")
-                    finally:
-                        loop.close()
-                
-                thread = threading.Thread(target=_thread_log_to_loki, daemon=True)
-                thread.start()
+            from app.core.background_tasks import run_loki_logging_background
+            run_loki_logging_background(log_data, method, response.status_code)
         except Exception as e:
             # Don't let logging errors affect the response
             logger.debug(f"Failed to schedule background log to Loki: {str(e)}")
