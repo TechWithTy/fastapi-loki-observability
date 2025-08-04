@@ -21,16 +21,22 @@ def loki_test_settings():
     class EnvAwareSettings:
         def __init__(self, settings):
             self.monitoring = settings.monitoring
-            self.redis = settings.redis
-            self.app = settings.app
-            self.security = settings.security
+            # Note: Redis settings are not in the main config, use defaults
+            self.redis = type('Redis', (), {
+                'REDIS_HOST': os.environ.get("REDIS_HOST", "localhost"),
+                'REDIS_PORT': int(os.environ.get("REDIS_PORT", "6379"))
+            })()
+            self.app = type('App', (), {
+                'FASTAPI_PORT': int(os.environ.get("FASTAPI_PORT", "8000"))
+            })()
+            self.security = type('Security', (), {
+                'OTEL_EXPORTER_OTLP_ENDPOINT': os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", self.monitoring.OTEL_EXPORTER_OTLP_ENDPOINT),
+                'OTEL_EXPORTER_OTLP_INSECURE': os.environ.get("OTEL_EXPORTER_OTLP_INSECURE", str(self.monitoring.OTEL_EXPORTER_OTLP_INSECURE)) == "True"
+            })()
+            
+            # Update monitoring with environment overrides
             self.monitoring.GRAFANA_URL = os.environ.get("GRAFANA_URL", self.monitoring.GRAFANA_URL)
             self.monitoring.GRAFANA_PORT = int(os.environ.get("GRAFANA_PORT", self.monitoring.GRAFANA_PORT))
-            self.redis.REDIS_HOST = os.environ.get("REDIS_HOST", self.redis.REDIS_HOST)
-            self.redis.REDIS_PORT = int(os.environ.get("REDIS_PORT", self.redis.REDIS_PORT))
-            self.app.FASTAPI_PORT = int(os.environ.get("FASTAPI_PORT", self.app.FASTAPI_PORT))
-            self.security.OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", self.security.OTEL_EXPORTER_OTLP_ENDPOINT)
-            self.security.OTEL_EXPORTER_OTLP_INSECURE = os.environ.get("OTEL_EXPORTER_OTLP_INSECURE", str(self.security.OTEL_EXPORTER_OTLP_INSECURE)) == "True"
     return EnvAwareSettings(settings)
 
 
@@ -46,7 +52,7 @@ def test_loki_settings_loaded(loki_test_settings):
     port = int(loki_url.split(':')[-1]) if ':' in loki_url else 3000
     print(f"[DEBUG] (test_loki_settings_loaded) host: {host}, port: {port}")
     docker_ps = subprocess.run(["docker", "ps"], capture_output=True, text=True)
-    print("[DEBUG] (test_loki_settings_loaded) docker ps output:\n" + docker_ps.stdout)
+    print("[DEBUG] (test_loki_settings_loaded) docker ps output:\n" + (docker_ps.stdout or "No output"))
     print(f"[DEBUG] Checking Loki endpoint {host}:{port} with socket.connect_ex...")
     with socket.socket() as s:
         s.settimeout(2)

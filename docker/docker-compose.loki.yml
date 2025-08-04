@@ -6,13 +6,13 @@ services:
     image: grafana/loki:2.9.2 # Pinned version
     container_name: loki
     restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c", "mkdir -p /loki/index /loki/index_cache /loki/chunks && exec /usr/bin/loki -config.file=/etc/loki/loki-config.yaml -config.expand-env=true"]
+    command: ["-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true"]
     ports:
       # Expose Loki's API/ingestion port
       - "${LOKI_PORT:-3100}:3100"
     volumes:
       # Mount the correct Loki configuration file (read-only)
-      - ./loki-local-config.yaml:/etc/loki/loki-config.yaml:ro
+      - "./loki-local-config.yaml:/etc/loki/loki-config.yaml:ro"
       # Mount the volume for Loki data storage (index, chunks)
       - loki-data:/loki
     networks:
